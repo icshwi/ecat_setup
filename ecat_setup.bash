@@ -157,10 +157,12 @@ ${SUDO_CMD} systemctl enable ${ECAT_MASTER_SYSTEMD};
 
 mac_address=$(get_macaddr ${NETWORK0});
 
-mkdir ./tmp
 
-m4 -D_MASTER0_DEVICE="${mac_address}" ${SC_TOP}/ethercat.conf.m4 > ${SC_TOP}/tmp/ethercat.conf
+m4 -D_MASTER0_DEVICE="${mac_address}" -D_DEVICE_MODULES="${ECAT_KMOD_GENERIC_NAME}" ${SC_TOP}/ethercat.conf.m4 > ${SC_TOP}/ethercat.conf_temp
 
-${SUDO_CMD} install -m 644 ${SC_TOP}/tmp/ethercat.conf /etc/
+${SUDO_CMD} install -m 644 ${SC_TOP}/ethercat.conf_temp /etc/ethercat.conf
 
-rm -rf ./tmp
+rm ${SC_TOP}/ethercat.conf_temp
+
+
+

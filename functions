@@ -25,10 +25,11 @@ function getHostname {
     
 }
 
+# Debian has also /sbin/ip 
 
 function get_macaddr {
     local dev=${1};
-    ip addr show dev ${dev} | grep "link/ether" | awk '{print $2}'
+    /sbin/ip addr show dev ${dev} | grep "link/ether" | awk '{print $2}'
 }
 
 
