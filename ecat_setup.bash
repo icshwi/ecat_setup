@@ -17,8 +17,8 @@
 #
 # Author : Jeong Han Lee
 # email  : jeonghan.lee@gmail.com
-# Date   : Tuesday, October 17 16:08:41 CEST 2017
-# version : 0.0.1
+# Date   : Thursday, October 26 09:38:47 CEST 2017
+# version : 0.0.2
 
 declare -gr SC_SCRIPT="$(realpath "$0")"
 declare -gr SC_SCRIPTNAME=${0##*/}
@@ -32,7 +32,13 @@ set +a
 . ${SC_TOP}/functions
 
 
+function pushd { builtin pushd "$@" > /dev/null; }
+function popd  { builtin popd  "$@" > /dev/null; }
+
 declare -gr SUDO_CMD="sudo";
+declare -g  WHICH_MASTER="";
+declare -g  MASTER_REP_URL="";
+declare -g  SD_UNIT_PATH="";
 
 
 # arg1 : KMOD NAME
@@ -73,96 +79,188 @@ function put_udev_rule(){
 }
 
 
-${SUDO_CMD} -v
+
+function build_master {
+
+    printf "Building......\n\n"
+    
+    eval ${MASTER_REP_URL}
+
+    pushd ${WHICH_MASTER}
+
+    touch ChangeLog
+    autoreconf --force --install -v
+    
+    ./configure --disable-8139too
+    make 
+    ${SUDO_CMD} make install
+    popd
+
+    
+}
+
+function setup_for_centos {
+
+    ${SUDO_CMD} -v
+    ${SUDO_CMD} yum -y install autoconf automake libtool graphviz hg kernel-devel
+    
+}
 
 
 
-${SUDO_CMD} yum install autoconf automake libtool graphviz hg kernel-devel
+function setup_for_debian {
+
+
+    ${SUDO_CMD} -v
+    ${SUDO_CMD}  aptitude install -y autoconf automake libtool graphviz  mercurial
+}
 
 
 
-hg clone http://hg.code.sf.net/p/etherlabmaster/code ethercat-hg
-
-cd ethercat-hg
-
-touch ChangeLog
-autoreconf --force --install -v
-
-./configure --disable-8139too
-# #
-
-# # # Default --prefix is /opt/etherlab
-
-make 
-sudo make install
-
-# iocuser@icslab-ecat01: etherlab$ tree -L 3
-# .
-# ├── [root       22]  bin
-# │   └── [root     7.0M]  ethercat
-# ├── [root       58]  etc
-# │   ├── [root     2.3K]  ethercat.conf
-# │   ├── [root       22]  init.d
-# │   │   └── [root     6.7K]  ethercat
-# │   └── [root       22]  sysconfig
-# │       └── [root     2.3K]  ethercat
-# ├── [root       35]  include
-# │   ├── [root      80K]  ecrt.h
-# │   └── [root     3.7K]  ectty.h
-# ├── [root      138]  lib
-# │   ├── [root     193K]  libethercat.a
-# │   ├── [root      948]  libethercat.la
-# │   ├── [root       20]  libethercat.so -> libethercat.so.1.0.0
-# │   ├── [root       20]  libethercat.so.1 -> libethercat.so.1.0.0
-# │   ├── [root     111K]  libethercat.so.1.0.0
-# │   └── [root       20]  systemd
-# │       └── [root       30]  system
-# └── [root       25]  sbin
-#     └── [root     5.6K]  ethercatctl
-
-# 9 directories, 12 files
 
 
-# iocuser@icslab-ecat01: /$ tree /opt/etherlab/lib/
-# /opt/etherlab/lib/
-# ├── [root     193K]  libethercat.a
-# ├── [root      948]  libethercat.la
-# ├── [root       20]  libethercat.so -> libethercat.so.1.0.0
-# ├── [root       20]  libethercat.so.1 -> libethercat.so.1.0.0
-# ├── [root     111K]  libethercat.so.1.0.0
-# └── [root       20]  systemd
-#     └── [root       30]  system
-#         └── [root      790]  ethercat.service
+function yes_or_no_to_go {
 
-# 2 directories, 6 files
+    printf "\n";
+    printf  ">>>> $1\n";
+    read -p ">>>> Do you want to continue (y/n)? " answer
+    case ${answer:0:1} in
+	y|Y )
+	    printf ">>>>  ...... ";
+	    ;;
+	* )
+            printf "Stop here.\n";
+	    exit;
+    ;;
+    esac
+
+}
 
 
 
-# sudo make modules modules_install clean
+function setup_systemd {
 
-#ethercat-1.5.2 (master)$ sudo modprobe -v ec_master main_devices="00:10:f3:4b:3a:bc"
-#ethercat-1.5.2 (master)$ sudo modprobe -v ec_generic
+    # Systemd setup
+
+    ${SUDO_CMD} install -m 644 ${ECAT_SYSTEMD_PATH}/${ECAT_MASTER_SYSTEMD} ${SD_UNIT_PATH}/
+    
+    ${SUDO_CMD} systemctl daemon-reload;
+    
+    ${SUDO_CMD} systemctl enable ${ECAT_MASTER_SYSTEMD};
+    
+    mac_address=$(get_macaddr ${NETWORK0});
+    
+    m4 -D_MASTER0_DEVICE="${mac_address}" -D_DEVICE_MODULES="${ECAT_KMOD_GENERIC_NAME}" ${SC_TOP}/ethercat.conf.m4 > ${SC_TOP}/ethercat.conf_temp
+    
+    ${SUDO_CMD} install -m 644 ${SC_TOP}/ethercat.conf_temp /etc/ethercat.conf
+    
+    rm ${SC_TOP}/ethercat.conf_temp
+}
 
 
+
+function select_master {
+
+    
+    local selected_one=0;
+    local ecmaster=1;
+    local etherlab=0;
+    local selected_limit=2;
+    
+    printf "\n";
+    printf "There are two EtherCAT masters which can be installed : \n";
+    printf "[0] ethercat-hg : etherlab open master\n";
+    printf "[1] ecmaster    : PSI customized master\n";
+    printf "Select which master could be built, followed by [ENTER]:\n";
+    read -e answer;
+
+    selected_one=${answer};
+    
+    if [[ "$selected_one" -gt "$selected_limit" ]]; then
+	printf "\n>>> Please select one of %s\n" "${selected_limit}"
+	exit 1;
+    fi
+    if [[ "$selected_one" -lt "0" ]]; then
+	printf "\n>>> Please select one number larger than 0\n" 
+	exit 1;
+    fi
+
+    if [ "$selected_one" -eq ${etherlab} ]; then
+	WHICH_MASTER="ethercat-hg"
+	MASTER_REP_URL="hg clone http://hg.code.sf.net/p/etherlabmaster/code ${WHICH_MASTER}"
+    elif [ "$selected_one" -eq ${ecmaster} ]; then
+	WHICH_MASTER="ecmaster"
+	MASTER_REP_URL="git clone https://github.com/paulscherrerinstitute/${WHICH_MASTER}"
+    else
+	printf "We don't support your selection\n";
+	printf "* ethercat-hg : etherlab open master\n";
+	printf "* ecmaster    : PSI customized master\n";
+	exit ;
+    fi
+
+    printf "\n"
+    printf "The %s was selected\n" "$WHICH_MASTER";
+    printf "Its command is %s\n" "${MASTER_REP_URL}";
+    printf "\n\n";
+    
+    
+}
+
+
+
+dist=$(find_dist)
+
+case "$dist" in
+    *Debian*)
+	printf "Debian is detected as $dist\n"
+	
+	SD_UNIT_PATH=${SD_UNIT_PATH01}
+	
+	read -p ">>>> Do you want to install packages (y/n)? " answer
+	case ${answer:0:1} in
+	    y|Y )
+	    	setup_for_debian
+	    ;;
+	* )
+            printf "Skip to install packages.\n";
+	    
+	    ;;
+	esac
+	;;
+    *CentOS*)
+	printf "CentOS is detected as $dist\n"
+	SD_UNIT_PATH=${SD_UNIT_PATH02}
+	
+	read -p ">>>> Do you want to install packages (y/n)? " answer
+	case ${answer:0:1} in
+	    y|Y )
+	    	setup_for_centos
+	    ;;
+	* )
+            printf "Skip to install packages.\n";
+	    
+	    ;;
+	esac
+	;;
+    *)
+	printf "\n";
+	printf "Doesn't support the detected $dist\n";
+	printf "Please contact jeonghan.lee@gmail.com\n";
+	printf "\n";
+	exit;
+	;;
+esac
+
+
+
+select_master
+build_master
+setup_systemd
 put_udev_rule "${ECAT_KMOD_NAME}"
 
 
-# Systemd setup
 
-${SUDO_CMD} install -m 644 ${ECAT_SYSTEMD_PATH}/${ECAT_MASTER_SYSTEMD} ${SD_UNIT_PATH01}/
-
-${SUDO_CMD} systemctl daemon-reload;
-
-${SUDO_CMD} systemctl enable ${ECAT_MASTER_SYSTEMD};
-
-mac_address=$(get_macaddr ${NETWORK0});
-
-
-m4 -D_MASTER0_DEVICE="${mac_address}" -D_DEVICE_MODULES="${ECAT_KMOD_GENERIC_NAME}" ${SC_TOP}/ethercat.conf.m4 > ${SC_TOP}/ethercat.conf_temp
-
-${SUDO_CMD} install -m 644 ${SC_TOP}/ethercat.conf_temp /etc/ethercat.conf
-
-rm ${SC_TOP}/ethercat.conf_temp
+exit 0;
 
 
 

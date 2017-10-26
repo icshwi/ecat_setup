@@ -52,3 +52,21 @@ function cat_file () {
     cat $file
     __end_func ${func_name};
 }
+
+
+function find_dist {
+
+    local dist_id dist_cn dist_rs PRETTY_NAME
+    
+    if [[ -f /usr/bin/lsb_release ]] ; then
+     	dist_id=$(lsb_release -is)
+     	dist_cn=$(lsb_release -cs)
+     	dist_rs=$(lsb_release -rs)
+     	echo $dist_id ${dist_cn} ${dist_rs}
+    else
+     	eval $(cat /etc/os-release | grep -E "^(PRETTY_NAME)=")
+	echo ${PRETTY_NAME}
+    fi
+
+ 
+}
