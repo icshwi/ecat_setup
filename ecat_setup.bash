@@ -1,5 +1,6 @@
 #!/bin/bash
 #
+#  Copyright (c) 2017 - Present Jeong Han Lee
 #  Copyright (c) 2017 - Present European Spallation Source ERIC
 #
 #  The program is free software: you can redistribute
@@ -17,8 +18,8 @@
 #
 # Author : Jeong Han Lee
 # email  : jeonghan.lee@gmail.com
-# Date   : Thursday, October 26 09:38:47 CEST 2017
-# version : 0.0.2
+# Date   : Thursday, October 26 22:29:45 CEST 2017
+# version : 0.0.3
 
 declare -gr SC_SCRIPT="$(realpath "$0")"
 declare -gr SC_SCRIPTNAME=${0##*/}
@@ -92,28 +93,33 @@ function build_master {
     eval ${MASTER_REP_URL}
 
     printf "Moving to %s\n" "${WHICH_MASTER}"
-    
+
+    if [ "${WHICH_MASTER}" = "m-ethercat" ]; then
+	WHICH_MASTER+="/ethercat-1.5.2"
+    fi
+
+    echo ${WHICH_MASTER}
     pushd ${WHICH_MASTER}
 
     
     touch ChangeLog
 
-    # Temp solution for ecmaster
-    if [ "${WHICH_MASTER}" = "ecmaster" ]; then
-   	cp -f ../configure.ac .
-    fi
+    # # Temp solution for ecmaster
+    # if [ "${WHICH_MASTER}" = "ecmaster" ]; then
+    # 	cp -f ../configure.ac .
+    # fi
 
-    
-    
     autoreconf --force --install -v
     
     ./configure --disable-8139too
     make 
     ${SUDO_CMD} make install
-    popd
-
+    make modules
+    ${SUDO_CMD} make modules_install
     
+    popd
 }
+
 
 function setup_for_centos {
 
@@ -179,14 +185,17 @@ function select_master {
 
     
     local selected_one=0;
+    local selected_limit=3;
+    local essmaster=2;
     local ecmaster=1;
     local etherlab=0;
-    local selected_limit=2;
+
     
     printf "\n";
-    printf "There are two EtherCAT masters which can be installed : \n";
+    printf "There are three EtherCAT masters which can be installed : \n";
     printf "[0] ethercat-hg : etherlab open master\n";
-    printf "[1] ecmaster    : PSI customized master\n";
+    printf "[1] ecmaster    : PSI customized master (forked, patched) \n";
+    printf "[2] m-ethercat  : ESS customized master (based on old PSI one)\n";
     printf "Select which master could be built, followed by [ENTER]:\n";
     read -e answer;
 
@@ -207,10 +216,14 @@ function select_master {
     elif [ "$selected_one" -eq ${ecmaster} ]; then
 	WHICH_MASTER="ecmaster"
 	MASTER_REP_URL="git clone https://github.com/icshwi/${WHICH_MASTER}"
+    elif [ "$selected_one" -eq ${essmaster} ]; then
+	WHICH_MASTER="m-ethercat"
+	MASTER_REP_URL="git clone https://bitbucket.org/europeanspallationsource/${WHICH_MASTER}"
     else
 	printf "We don't support your selection\n";
 	printf "* ethercat-hg : etherlab open master\n";
 	printf "* ecmaster    : PSI customized master\n";
+	printf "* m-ethercat  :ESS customized master (based on old PSI one)\n";
 	exit ;
     fi
 
@@ -271,8 +284,8 @@ esac
 
 select_master
 build_master
-#setup_systemd
-#put_udev_rule "${ECAT_KMOD_NAME}"
+setup_systemd
+put_udev_rule "${ECAT_KMOD_NAME}"
 
 
 
