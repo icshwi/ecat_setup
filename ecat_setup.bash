@@ -83,12 +83,28 @@ function put_udev_rule(){
 function build_master {
 
     printf "Building......\n\n"
+    printf "Cloning ......\n\n"
+    printf "%s\n" "${MASTER_REP_URL}"
+
+    local autoreconf_option="subdir-objects"
+    
     
     eval ${MASTER_REP_URL}
 
+    printf "Moving to %s\n" "${WHICH_MASTER}"
+    
     pushd ${WHICH_MASTER}
 
+    
     touch ChangeLog
+
+    # Temp solution for ecmaster
+    if [ "${WHICH_MASTER}" = "ecmaster" ]; then
+   	cp -f ../configure.ac .
+    fi
+
+    
+    
     autoreconf --force --install -v
     
     ./configure --disable-8139too
@@ -190,7 +206,7 @@ function select_master {
 	MASTER_REP_URL="hg clone http://hg.code.sf.net/p/etherlabmaster/code ${WHICH_MASTER}"
     elif [ "$selected_one" -eq ${ecmaster} ]; then
 	WHICH_MASTER="ecmaster"
-	MASTER_REP_URL="git clone https://github.com/paulscherrerinstitute/${WHICH_MASTER}"
+	MASTER_REP_URL="git clone https://github.com/icshwi/${WHICH_MASTER}"
     else
 	printf "We don't support your selection\n";
 	printf "* ethercat-hg : etherlab open master\n";
@@ -255,8 +271,8 @@ esac
 
 select_master
 build_master
-setup_systemd
-put_udev_rule "${ECAT_KMOD_NAME}"
+#setup_systemd
+#put_udev_rule "${ECAT_KMOD_NAME}"
 
 
 
