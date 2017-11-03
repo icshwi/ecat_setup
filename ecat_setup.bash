@@ -186,7 +186,11 @@ function setup_systemd {
     __end_func ${func_name};
 }
 
-
+function activate_network {
+    local func_name=${FUNCNAME[*]};  __ini_func ${func_name};
+    ${SUDO_CMD} ip link set dev ${NETWORK0} up
+    __end_func ${func_name};
+}
 
 function select_master {
 
@@ -291,7 +295,10 @@ esac
 
 select_master
 build_master
+activate_network
 setup_systemd
+
+
 put_udev_rule "${ECAT_KMOD_NAME}"
 
 
