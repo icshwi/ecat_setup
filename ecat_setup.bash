@@ -134,7 +134,8 @@ function setup_for_debian {
 
 
     ${SUDO_CMD} -v
-    ${SUDO_CMD}  aptitude install -y autoconf automake libtool graphviz  mercurial
+    ${SUDO_CMD} apt-get install -y autoconf automake libtool graphviz  mercurial
+    ${SUDO_CMD} apt-get install -y linux-headers-$(uname -r)
 }
 
 
