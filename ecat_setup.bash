@@ -82,7 +82,9 @@ function put_udev_rule(){
 
 
 function build_master {
-
+    
+    local func_name=${FUNCNAME[*]};  __ini_func ${func_name};
+    
     printf "Building......\n\n"
     printf "Cloning ......\n\n"
     printf "%s\n" "${MASTER_REP_URL}"
@@ -112,12 +114,12 @@ function build_master {
     autoreconf --force --install -v
     
     ./configure --disable-8139too
-    make 
-    ${SUDO_CMD} make install
-    make modules
-    ${SUDO_CMD} make modules_install
-    
+    ${SUDO_CMD} make install clean
+    ${SUDO_CMD} make modules modules_install clean
+    ${SUDO_CMD} depmod --quick
     popd
+
+    __end_func ${func_name};
 }
 
 
@@ -163,8 +165,11 @@ function yes_or_no_to_go {
 
 function setup_systemd {
 
+    local func_name=${FUNCNAME[*]};  __ini_func ${func_name};
     # Systemd setup
 
+#    echo ${ECAT_SYSTEMD_PATH}/${ECAT_MASTER_SYSTEMD}
+#    echo ${SD_UNIT_PATH}
     ${SUDO_CMD} install -m 644 ${ECAT_SYSTEMD_PATH}/${ECAT_MASTER_SYSTEMD} ${SD_UNIT_PATH}/
     
     ${SUDO_CMD} systemctl daemon-reload;
@@ -178,9 +183,15 @@ function setup_systemd {
     ${SUDO_CMD} install -m 644 ${SC_TOP}/ethercat.conf_temp /etc/ethercat.conf
     
     rm ${SC_TOP}/ethercat.conf_temp
+
+    __end_func ${func_name};
 }
 
-
+function activate_network {
+    local func_name=${FUNCNAME[*]};  __ini_func ${func_name};
+    ${SUDO_CMD} ip link set dev ${NETWORK0} up
+    __end_func ${func_name};
+}
 
 function select_master {
 
@@ -285,7 +296,10 @@ esac
 
 select_master
 build_master
+activate_network
 setup_systemd
+
+
 put_udev_rule "${ECAT_KMOD_NAME}"
 
 
