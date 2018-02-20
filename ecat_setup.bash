@@ -205,9 +205,9 @@ function select_master {
     
     printf "\n";
     printf "There are three EtherCAT masters which can be installed : \n";
-    printf "[0] ethercat-hg : etherlab open master\n";
-    printf "[1] ecmaster    : PSI customized master (forked, patched) \n";
-    printf "[2] m-ethercat  : ESS customized master (based on old PSI one)\n";
+    printf "[0] etherlabmaster-code : etherlab open master\n";
+    printf "[1] ecmaster            : PSI customized master (forked, patched) \n";
+    printf "[2] m-ethercat          : ESS customized master (based on old PSI one)\n\n";
     printf "Select which master could be built, followed by [ENTER]:\n";
     read -e answer;
 
@@ -223,8 +223,8 @@ function select_master {
     fi
 
     if [ "$selected_one" -eq ${etherlab} ]; then
-	WHICH_MASTER="ethercat-hg"
-	MASTER_REP_URL="hg clone http://hg.code.sf.net/p/etherlabmaster/code ${WHICH_MASTER}"
+	WHICH_MASTER="etherlabmaster-code"
+	MASTER_REP_URL="hg clone http://hg.code.sf.net/p/etherlabmaster/code ${WHICH_MASTER} -r stable-1.5"
     elif [ "$selected_one" -eq ${ecmaster} ]; then
 	WHICH_MASTER="ecmaster"
 	MASTER_REP_URL="git clone https://github.com/icshwi/${WHICH_MASTER}"
@@ -233,9 +233,9 @@ function select_master {
 	MASTER_REP_URL="git clone https://bitbucket.org/europeanspallationsource/${WHICH_MASTER}"
     else
 	printf "We don't support your selection\n";
-	printf "* ethercat-hg : etherlab open master\n";
-	printf "* ecmaster    : PSI customized master\n";
-	printf "* m-ethercat  :ESS customized master (based on old PSI one)\n";
+	printf "* etherlabmaster-code  : Etherlab open master\n";
+	printf "* ecmaster             : PSI customized master\n";
+	printf "* m-ethercat           : ESS customized master (based on old PSI one)\n";
 	exit ;
     fi
 
