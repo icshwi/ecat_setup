@@ -1,0 +1,48 @@
+diff --git a/master/fsm_slave.c b/master/fsm_slave.c
+--- a/master/fsm_slave.c
++++ b/master/fsm_slave.c
+@@ -240,7 +240,7 @@
+         request->state = EC_INT_REQUEST_FAILURE;
+         wake_up_all(&slave->master->request_queue);
+         fsm->state = ec_fsm_slave_state_idle;
+-        return 1;
++        return 0;
+     }
+ 
+     if (slave->current_state == EC_SLAVE_STATE_INIT) {
+@@ -248,7 +248,7 @@
+         request->state = EC_INT_REQUEST_FAILURE;
+         wake_up_all(&slave->master->request_queue);
+         fsm->state = ec_fsm_slave_state_idle;
+-        return 1;
++        return 0;
+     }
+ 
+     fsm->sdo_request = request;
+@@ -342,7 +342,7 @@
+         wake_up_all(&slave->master->request_queue);
+         fsm->reg_request = NULL;
+         fsm->state = ec_fsm_slave_state_idle;
+-        return 1;
++        return 0;
+     }
+ 
+     // Found pending register request. Execute it!
+@@ -444,7 +444,7 @@
+         request->state = EC_INT_REQUEST_FAILURE;
+         wake_up_all(&slave->master->request_queue);
+         fsm->state = ec_fsm_slave_state_idle;
+-        return 1;
++        return 0;
+     }
+ 
+     request->state = EC_INT_REQUEST_BUSY;
+@@ -521,7 +521,7 @@
+         req->state = EC_INT_REQUEST_FAILURE;
+         wake_up_all(&slave->master->request_queue);
+         fsm->state = ec_fsm_slave_state_idle;
+-        return 1;
++        return 0;
+     }
+ 
+     if (slave->current_state == EC_SLAVE_STATE_INIT) {

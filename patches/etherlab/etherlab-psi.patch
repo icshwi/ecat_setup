@@ -1,0 +1,171 @@
+diff --git a/include/ecrt.h b/include/ecrt.h
+--- a/include/ecrt.h
++++ b/include/ecrt.h
+@@ -2024,6 +2024,15 @@
+         size_t size /**< Size to write. */
+         );
+ 
++
++/** Have all packets for a domain been received?
++ *
++ */
++int ecrt_domain_received(
++		ec_domain_t *domain /**< Domain */
++		);
++
++
+ /*****************************************************************************/
+ 
+ #ifdef __cplusplus
+diff --git a/lib/domain.c b/lib/domain.c
+--- a/lib/domain.c
++++ b/lib/domain.c
+@@ -154,3 +154,19 @@
+ }
+ 
+ /*****************************************************************************/
++
++int ecrt_domain_received( ec_domain_t *domain )
++{
++    ec_ioctl_domain_state_t data;
++    int ret;
++
++    data.domain_index = domain->index;
++
++    ret = ioctl( domain->master->fd, EC_IOCTL_PSI_DOM_RECEIVED, &data );
++
++    if( EC_IOCTL_IS_ERROR(ret) )
++        fprintf(stderr, "Failed to get domain received info: %s\n", strerror(EC_IOCTL_ERRNO(ret)) );
++
++    return ret;
++}
++
+diff --git a/lib/domain.h b/lib/domain.h
+--- a/lib/domain.h
++++ b/lib/domain.h
+@@ -44,3 +44,5 @@
+ void ec_domain_clear(ec_domain_t *);
+ 
+ /*****************************************************************************/
++int ecrt_domain_received( ec_domain_t *domain );
++
+diff --git a/lib/master.c b/lib/master.c
+--- a/lib/master.c
++++ b/lib/master.c
+@@ -258,8 +258,13 @@
+ 
+     ret = ioctl(master->fd, EC_IOCTL_SLAVE, &data);
+     if (EC_IOCTL_IS_ERROR(ret)) {
++/*
++ * commented out for now, was spamming stderr
++ * when called for slaves that died/disappeared long after the start
++ *
+         fprintf(stderr, "Failed to get slave info: %s\n",
+                 strerror(EC_IOCTL_ERRNO(ret)));
++*/
+         return -EC_IOCTL_ERRNO(ret);
+     }
+ 
+diff --git a/master/cdev.c b/master/cdev.c
+--- a/master/cdev.c
++++ b/master/cdev.c
+@@ -282,8 +282,8 @@
+     get_page(page);
+     vmf->page = page;
+ 
+-    EC_MASTER_DBG(priv->cdev->master, 1, "Vma fault,"
+-            " offset = %lu, page = %p\n", offset, page);
++    EC_MASTER_DBG(priv->cdev->master, 1, "Vma fault, virtual_address = %p,"
++            " offset = %lu, page = %p\n", vmf->virtual_address, offset, page);
+ 
+     return 0;
+ }
+diff --git a/master/ioctl.c b/master/ioctl.c
+--- a/master/ioctl.c
++++ b/master/ioctl.c
+@@ -42,6 +42,7 @@
+ #include "voe_handler.h"
+ #include "ethernet.h"
+ #include "ioctl.h"
++#include "datagram_pair.h"
+ 
+ /** Set to 1 to enable ioctl() latency tracing.
+  *
+@@ -1820,6 +1821,44 @@
+ 
+ /*****************************************************************************/
+ 
++/** Check whether a domain has received all its outstanding frames
++ *
++ * \return Zero on success, otherwise a negative error code.
++ */
++static ATTRIBUTES int ec_ioctl_psi_dom_received(
++        ec_master_t *master, /**< EtherCAT master. */
++        void *arg, /**< ioctl() argument. */
++        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
++        )
++{
++	int domain_nr;
++	ec_datagram_pair_t *datagram_pair;
++	ec_domain_t *domain;
++
++    if( copy_from_user( &domain_nr, (void __user *)arg, sizeof(domain_nr) ))
++        return -EFAULT;
++	if (down_interruptible(&master->master_sem))
++        return -EINTR;
++    if( !(domain = ec_master_find_domain( master, domain_nr) ))
++	{
++        up(&master->master_sem);
++        EC_MASTER_ERR(master, "Domain %u does not exist!\n", domain_nr);
++        return -EINVAL;
++    }
++
++    up(&master->master_sem);
++
++    list_for_each_entry( datagram_pair, &domain->datagram_pairs, list)
++    {
++        if( (&(datagram_pair->datagrams[0]))->state != EC_DATAGRAM_RECEIVED )
++            return 0;
++    }
++
++    return 1;
++}
++
++/*****************************************************************************/
++
+ /** Send frames.
+  *
+  * \return Zero on success, otherwise a negative error code.
+@@ -4593,6 +4632,9 @@
+             }
+             ret = ec_ioctl_set_send_interval(master, arg, ctx);
+             break;
++        case EC_IOCTL_PSI_DOM_RECEIVED:
++        	ret = ec_ioctl_psi_dom_received( master, arg, ctx );
++        	break;
+         default:
+             ret = -ENOTTY;
+             break;
+diff --git a/master/ioctl.h b/master/ioctl.h
+--- a/master/ioctl.h
++++ b/master/ioctl.h
+@@ -56,7 +56,7 @@
+  *
+  * Increment this when changing the ioctl interface!
+  */
+-#define EC_IOCTL_VERSION_MAGIC 28
++#define EC_IOCTL_VERSION_MAGIC 29
+ 
+ // Command-line tool
+ #define EC_IOCTL_MODULE                EC_IOR(0x00, ec_ioctl_module_t)
+@@ -153,6 +153,10 @@
+ #define EC_IOCTL_VOE_DATA             EC_IOWR(0x57, ec_ioctl_voe_t)
+ #define EC_IOCTL_SET_SEND_INTERVAL     EC_IOW(0x58, size_t)
+ 
++//New IOCTL from PSI
++#define EC_IOCTL_PSI_DOM_RECEIVED     EC_IOWR(0xa0, size_t)
++
++
+ /*****************************************************************************/
+ 
+ #define EC_IOCTL_STRING_SIZE 64
