@@ -66,12 +66,22 @@ patching file master/fsm_slave.c
 ```
 The optional `dry` argument runs the script in dry-run mode. This allows to verify if the patch can be applied without issues.
 
+After applying the patches, verify that the repository is really changed
+
+``` bash
+$ cd ../../ethercat-hg/
+$ hg id -nib
+9e65f782e8a1+ 2698+ stable-1.5
+```
+
 ### Install ethercat 
 
-Move to the ecat\_setup __top__ folder and install etherlab master as always
+Move to the ecat\_setup __top__ folder and install etherlab master.
 
 ``` bash
 $ cd ../../
+
+# Edit ecat_setup.conf to set the proper EtherCAT interface
 
 $ bash ecat_setup.bash 
 ...
@@ -85,3 +95,32 @@ Select which master could be built, followed by [ENTER]:
 ```
 Select `0` to proceed.
 
+Reboot the system to load kernel modules, then verify that ethercat modules are loaded and ethercat master is running
+``` bash
+$ lsmod | grep ec
+ec_generic             16384  0
+ec_master             262144  1 ec_generic
+...
+
+$ sudo dmesg | grep EtherCAT
+$ sudo dmesg | grep EtherCAT
+...
+EtherCAT: Master driver 1.5.2 9e65f782e8a1+
+EtherCAT: 1 master waiting for devices.
+ec_generic: EtherCAT master generic Ethernet device module 1.5.2 9e65f782e8a1+
+EtherCAT: Accepting XX:XX:XX:XX:XX:XX as main device for master 0.
+EtherCAT 0: Starting EtherCAT-IDLE thread.
+EtherCAT 0: Link state of ecm0 changed to UP.
+EtherCAT 0: 8 slave(s) responding on main device.
+EtherCAT 0: Slave states on main device: PREOP.
+EtherCAT 0: Scanning bus.
+EtherCAT 0: Bus scanning completed in 1268 ms.
+EtherCAT 0: Using slave 0 as DC reference clock.
+...
+
+$ /opt/etherlab/bin/ethercat master
+Master0
+  Phase: Idle
+  Active: no
+...
+```
